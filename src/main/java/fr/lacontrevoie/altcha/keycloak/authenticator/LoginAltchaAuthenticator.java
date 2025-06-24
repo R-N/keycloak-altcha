@@ -101,7 +101,6 @@ public class LoginAltchaAuthenticator extends UsernamePasswordForm {
                 .setMaxNumber(complexity)
                 .setHmacKey(hmacSecret)
                 .setExpiresInSeconds(ALTCHA_DEFAULT_EXPIRES);
-        config = context.getAuthenticatorConfig();
         
         return true;
 	}
