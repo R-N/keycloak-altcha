@@ -229,8 +229,9 @@ public class RegistrationAltcha implements FormAction, FormActionFactory {
         property = new ProviderConfigProperty();
         property.setName("complexity");
         property.setLabel("Complexity");
-        property.setType(ProviderConfigProperty.NUMBER_TYPE);
+        property.setType(ProviderConfigProperty.STRING_TYPE);
         property.setHelpText("Captcha complexity; see ALTCHA docs. 1000000 is a good value.");
+        property.setDefaultValue("1000000");
         CONFIG_PROPERTIES.add(property);
     }
 
