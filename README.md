@@ -20,7 +20,7 @@ There are a few steps you need to perform in the Keycloak Admin Console.
 
 ![Step 1](img/step-01.png)
 
-4. On the parent step named `<flow name> registration form`, click the « + » icon and select **Add step**.
+4. On the parent step named `<flow name> registration form`, click the « + » icon and select **Add execution**.
 5. Select **ALTCHA** in the list and click **Add**.
 6. Set the **ALTCHA** step requirement from Disabled to **Required**.
 7. Click the gear icon at the right of the ALTCHA step, then fill the following information:
@@ -40,7 +40,7 @@ You will need to edit the [login/register.ftl](https://github.com/keycloak/keycl
 
 ```html
 <#if altchaRequired??>
-    <altcha-widget challengejson='${altchaPayload}' <#if altchaFloating?? && altchaFloating=="true">floating</#if> hidefooter delay="2000" auto="onload" expire="3600000"></altcha-widget>
+    <altcha-widget challenge='${altchaPayload}' auto="${altchaAuto}" configuration='{"minDuration": ${altchaMinDuration}, "hideFooter": ${altchaHideFooter} }' display="${altchaDisplay}"></altcha-widget>
 </#if>
 ```
 
@@ -48,8 +48,8 @@ You can customize the widget settings following [the documentation](https://altc
 
 Then, save the following into the `login/resources/js` folder:
 ```
-curl -o altcha.min.js https://cdn.jsdelivr.net/gh/altcha-org/altcha/dist/altcha.min.js
-curl -o altcha-i18n.min.js https://cdn.jsdelivr.net/gh/altcha-org/altcha/dist_i18n/all.min.js
+curl -o altcha.min.js https://cdn.jsdelivr.net/npm/altcha@3.0.11/dist/main/altcha.min.js
+curl -o altcha-i18n.min.js https://cdn.jsdelivr.net/gh/altcha-org/altcha/dist/i18n/all.min.js
 ```
 _You will have to **update those files manually**, monitor [this Releases channel](https://github.com/altcha-org/altcha/releases) for security updates. Beware of breaking changes._
 
@@ -67,6 +67,8 @@ In the `theme.properties` file, add `js/altcha-import.js` into the `scripts=` se
 1. In the **Authentication** left menu item, **Flows tab**, click on the options dropdown of your custom registration flow and click on **Bind flow**.
 2. Finally, enable registration : go to **Realm settings**, **Login** tab, and toggle **User registration** on.
 
+_NB.: Ensure that your theme is **selected** in Realm Settings -> Themes._
+
 And that’s it!
 
 ## Compiling it yourself
@@ -77,7 +79,7 @@ Clone the repository:
 git clone https://git.lacontrevoie.fr/lacontrevoie/keycloak-altcha/
 ```
 
-Inside the repository, compile it using Maven with Java 17:
+Inside the repository, compile it using Maven with Java 21:
 
 ```bash
 mvn clean compile package
@@ -86,7 +88,7 @@ mvn clean compile package
 You can instruct Maven to use a specific Java version by prepending the JAVA_HOME environment variable:
 
 ```bash
-JAVA_HOME=/usr/lib/jvm/java-17-openjdk/  mvn clean compile package
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk/  mvn clean compile package
 ```
 You will get two JAR files in the `target/` folder. The one you’re looking for is `keycloak-altcha-jar-with-dependencies.jar`.
 

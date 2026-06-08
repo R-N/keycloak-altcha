@@ -22,17 +22,13 @@ import jakarta.ws.rs.core.MultivaluedMap;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Arrays;
 
-import org.altcha.altcha.Altcha;
-import org.altcha.altcha.Altcha.ChallengeOptions;
-import org.altcha.altcha.Altcha.Challenge;
-import org.altcha.altcha.Altcha.Payload;
+import org.altcha.altcha.v2.Altcha;
 
 public class RegistrationAltcha implements FormAction, FormActionFactory {
     public static final String ALTCHA_RESPONSE = "altcha";
     public static final String ALTCHA_REFERENCE_CATEGORY = "altcha";
-    // 1 hour expiration for captcha
-    public static final long ALTCHA_DEFAULT_EXPIRES = 3600;
 
     public static final String PROVIDER_ID = "registration-altcha-action";
 
@@ -109,36 +105,37 @@ public class RegistrationAltcha implements FormAction, FormActionFactory {
 
         // retrieve ALTCHA settings
         String hmacSecret = captchaConfig.getConfig().get("secret");
-        String floating = captchaConfig.getConfig().get("floating");
-        long complexity = Integer.parseInt(captchaConfig.getConfig().get("complexity"));
+        int expireDelay = Integer.parseInt(captchaConfig.getConfig().get("expireDelay"));
+        int complexity = Integer.parseInt(captchaConfig.getConfig().get("complexity"));
 
         // create challenge
-        ChallengeOptions options = new ChallengeOptions()
-            .setMaxNumber(complexity)
-            .setHmacKey(hmacSecret)
-            .setExpiresInSeconds(ALTCHA_DEFAULT_EXPIRES);
+        var options = new Altcha.CreateChallengeOptions()
+            .algorithm("PBKDF2/SHA-256")
+            .cost(complexity)
+            .hmacSignatureSecret(hmacSecret)
+            .expiresInSeconds(expireDelay);
 
         // create payload
         try {
-            Challenge challenge = Altcha.createChallenge(options);
-        
-            // add payload data to the form
-            JSONObject jsonPayload = new JSONObject();
+            Altcha.Challenge challenge = Altcha.createChallenge(options);
 
-            jsonPayload.put("algorithm", challenge.algorithm);
-            jsonPayload.put("challenge", challenge.challenge);
-            jsonPayload.put("salt", challenge.salt);
-            jsonPayload.put("signature", challenge.signature);
-            jsonPayload.put("maxnumber", options.maxNumber);
-
-            form.setAttribute("altchaPayload", jsonPayload.toString());
+            form.setAttribute("altchaPayload", challenge.toJson());
 
         } catch (Exception e) {
             ServicesLogger.LOGGER.recaptchaFailed(e);
         }
 
+        String minDuration = captchaConfig.getConfig().get("minDuration");
+        Boolean hideFooter = Boolean.parseBoolean(captchaConfig.getConfig().get("hideFooter"));
+        String auto = captchaConfig.getConfig().get("auto");
+        String display = captchaConfig.getConfig().get("display");
+
         form.setAttribute("altchaRequired", true);
-        form.setAttribute("altchaFloating", floating);
+        form.setAttribute("altchaDisplay", display);
+        form.setAttribute("altchaMinDuration", minDuration);
+        form.setAttribute("altchaHideFooter", hideFooter.toString());
+        form.setAttribute("altchaAuto", auto);
+        form.setAttribute("altchaAuto", auto);
     }
 
     @Override
@@ -166,7 +163,8 @@ public class RegistrationAltcha implements FormAction, FormActionFactory {
 
         try {
             // check if captcha solution is valid
-            if (!Altcha.verifySolution(captcha_resp, hmacKey, true)) {
+            Altcha.VerifySolutionResult result = Altcha.verifySolution(captcha_resp, hmacKey, Altcha.kdf("PBKDF2/SHA-256"));
+            if (!result.verified()) {
                 errors.add(new FormMessage("altcha.captchaValidationFailed"));
             }
 
@@ -217,21 +215,67 @@ public class RegistrationAltcha implements FormAction, FormActionFactory {
         property.setLabel("ALTCHA HMAC Secret");
         property.setType(ProviderConfigProperty.STRING_TYPE);
         property.setHelpText("HMAC secret key - a long random string should be enough");
+        property.setRequired(true);
         CONFIG_PROPERTIES.add(property);
         
         property = new ProviderConfigProperty();
-        property.setName("floating");
-        property.setLabel("ALTCHA Floating UI");
-        property.setType(ProviderConfigProperty.BOOLEAN_TYPE);
-        property.setHelpText("Enables the floating widget UI; see ALTCHA documentation for more details. Warning: the UI may need styling.");
+        property.setName("expireDelay");
+        property.setLabel("Expiration delay");
+        property.setType(ProviderConfigProperty.NUMBER_TYPE);
+        property.setHelpText("For how many seconds a captcha challenge is valid. Defaults to 3600.");
+        property.setDefaultValue(3600);
+        property.setRequired(true);
         CONFIG_PROPERTIES.add(property);
         
         property = new ProviderConfigProperty();
         property.setName("complexity");
         property.setLabel("Complexity");
         property.setType(ProviderConfigProperty.NUMBER_TYPE);
-        property.setHelpText("Captcha complexity; see ALTCHA docs. 1000000 is a good value.");
+        property.setHelpText("Captcha complexity (or cost); see ALTCHA docs. Should usually be comprised between 50 000 and 500 000. Defaults to 100 000. Write it without spaces.");
+        property.setRequired(true);
+        property.setDefaultValue(1000000);
         CONFIG_PROPERTIES.add(property);
+        
+        property = new ProviderConfigProperty();
+        property.setName("display");
+        property.setLabel("Display mode");
+        property.setType(ProviderConfigProperty.LIST_TYPE);
+        List<String> display_options = Arrays.asList("standard", "bar", "floating", "overlay", "invisible");
+        property.setOptions(display_options);
+        property.setHelpText("UI setting, default is 'standard'. See ALTCHA docs.");
+        property.setDefaultValue("standard");
+        property.setRequired(true);
+        CONFIG_PROPERTIES.add(property);
+        
+        property = new ProviderConfigProperty();
+        property.setName("hideFooter");
+        property.setLabel("Hide the ALTCHA footer");
+        property.setType(ProviderConfigProperty.BOOLEAN_TYPE);
+        property.setHelpText("UI setting. Hides the ALTCHA footer. Defaults to false.");
+        property.setDefaultValue(Boolean.FALSE.toString());
+        property.setRequired(true);
+        CONFIG_PROPERTIES.add(property);
+        
+        property = new ProviderConfigProperty();
+        property.setName("auto");
+        property.setLabel("Automated verification");
+        property.setType(ProviderConfigProperty.LIST_TYPE);
+        List<String> auto_options = Arrays.asList("off", "onfocus", "onload", "onsubmit");
+        property.setOptions(auto_options);
+        property.setHelpText("Solves the challenge automatically. Default is 'off'.");
+        property.setDefaultValue("off");
+        property.setRequired(true);
+        CONFIG_PROPERTIES.add(property);
+        
+        property = new ProviderConfigProperty();
+        property.setName("minDuration");
+        property.setLabel("Minimal duration");
+        property.setType(ProviderConfigProperty.NUMBER_TYPE);
+        property.setHelpText("Default is 500. See ALTCHA docs.");
+        property.setDefaultValue(500);
+        property.setRequired(true);
+        CONFIG_PROPERTIES.add(property);
+        
     }
 
     @Override
