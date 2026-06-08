@@ -1,4 +1,4 @@
-#/bin/bash
+#!/bin/bash
 
 # Used to build the JAR file from our custom runner_image
 # Using Debian Bookworm
