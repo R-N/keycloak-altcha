@@ -23,15 +23,25 @@ import jakarta.ws.rs.core.MultivaluedMap;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.altcha.altcha.v2.Altcha;
 
+
 public class RegistrationAltcha implements FormAction, FormActionFactory {
+
     public static final String ALTCHA_RESPONSE = "altcha";
     public static final String ALTCHA_REFERENCE_CATEGORY = "altcha";
-
     public static final String PROVIDER_ID = "registration-altcha-action";
 
+
+    private static final Set<String> seen_hashes = new HashSet<>();
+
+    public static synchronized boolean addToCache(String value) {
+        return seen_hashes.add(value);
+    }
+    
     @Override
     public void close() {
 
@@ -88,7 +98,7 @@ public class RegistrationAltcha implements FormAction, FormActionFactory {
 
     @Override
     public String getHelpText() {
-        return "Adds ALTCHA button.  ALTCHA verify that the entity that is registering is a human. It must be configured after you add it.";
+        return "Adds ALTCHA button. ALTCHA is a PoW captcha that helps to combat bot activity. It must be configured after you add it.";
     }
 
 
@@ -166,6 +176,14 @@ public class RegistrationAltcha implements FormAction, FormActionFactory {
             Altcha.VerifySolutionResult result = Altcha.verifySolution(captcha_resp, hmacKey, Altcha.kdf("PBKDF2/SHA-256"));
             if (!result.verified()) {
                 errors.add(new FormMessage("altcha.captchaValidationFailed"));
+            }
+
+            // if the solution is valid, add it to the cache to prevent replay attacks
+            String payload_signature = Altcha.parsePayload(captcha_resp).challenge().signature();
+
+            // if addToCache returns 0, it means that the signature is already present
+            if (!addToCache(payload_signature)) {
+                errors.add(new FormMessage("altcha.captchaReplayed"));
             }
 
         } catch (Exception e) {
