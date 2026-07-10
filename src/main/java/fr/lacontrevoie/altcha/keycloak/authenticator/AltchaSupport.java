@@ -118,8 +118,12 @@ public final class AltchaSupport {
         return Altcha.verifySolution(response, hmacKey, true);
     }
 
-    /** True when the provider has a usable config (non-null secret). */
+    /** True when the provider has a usable config (non-blank secret). */
     public static boolean isConfigured(Map<String, String> config) {
-        return config != null && config.get(KEY_SECRET) != null;
+        if (config == null) {
+            return false;
+        }
+        String secret = config.get(KEY_SECRET);
+        return secret != null && !secret.trim().isEmpty();
     }
 }

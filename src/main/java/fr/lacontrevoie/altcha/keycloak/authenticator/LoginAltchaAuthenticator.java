@@ -54,8 +54,11 @@ public class LoginAltchaAuthenticator extends UsernamePasswordForm {
 
         REQUEST_CONFIG.set(config);
         try {
-            // createLoginForm() re-attaches the challenge for any render that does go
-            // through it (e.g. login-hint / remember-me prefill re-renders).
+            // Both of UsernamePasswordForm.authenticate()'s branches (plain and
+            // login-hint / remember-me prefill) converge on the same render path we
+            // just handled above, so createLoginForm() is not reached from here. The
+            // ThreadLocal is set regardless as a safety net in case that ever changes,
+            // and because action() reuses this same field.
             super.authenticate(context);
         } finally {
             REQUEST_CONFIG.remove();
