@@ -39,11 +39,23 @@ public class LoginAltchaAuthenticator extends UsernamePasswordForm {
                     context.form().createLoginUsernamePassword());
             return;
         }
+        Map<String, String> config = configModel.getConfig();
 
-        REQUEST_CONFIG.set(configModel.getConfig());
+        // UsernamePasswordForm.authenticate() renders the initial form through a path
+        // that calls form.createLoginUsernamePassword() directly, bypassing
+        // createLoginForm(). context.form() returns the same request-scoped
+        // LoginFormsProvider instance on every call, so attaching the challenge to it
+        // here makes it present by the time that render happens.
         try {
-            // Lets UsernamePasswordForm handle username prefill (login hint / remember me)
-            // and render via createLoginForm(), where we inject the challenge.
+            AltchaSupport.applyChallenge(config, context.form());
+        } catch (Exception e) {
+            ServicesLogger.LOGGER.recaptchaFailed(e);
+        }
+
+        REQUEST_CONFIG.set(config);
+        try {
+            // createLoginForm() re-attaches the challenge for any render that does go
+            // through it (e.g. login-hint / remember-me prefill re-renders).
             super.authenticate(context);
         } finally {
             REQUEST_CONFIG.remove();
