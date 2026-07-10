@@ -33,7 +33,7 @@ Two independent Keycloak SPI providers, both taking the same four config propert
 1. Build phase — `applyChallenge` runs `Altcha.createChallenge(options)`, serializes fields (`algorithm`, `challenge`, `salt`, `signature`, `maxnumber`) into `altchaPayload`, plus `altchaRequired` + `altchaFloating`. The theme's `<altcha-widget>` reads these.
 2. Validate phase — read `altcha` form param, reject if blank, else `verifySolution`.
 
-Error i18n keys returned to forms: `altcha.captchaFormEmpty`, `altcha.captchaValidationFailed`, `altcha.captchaValidationException`. Missing-config uses Keycloak's `Messages.RECAPTCHA_NOT_CONFIGURED`.
+Error i18n keys returned to forms: `altcha.captchaFormEmpty`, `altcha.captchaValidationFailed`, `altcha.captchaValidationException`. Missing or blank `secret` (`AltchaSupport.isConfigured`) uses Keycloak's `Messages.RECAPTCHA_NOT_CONFIGURED`.
 
 `jboss-deployment-structure.xml` declares the `keycloak-services` module dependency for the fat JAR.
 
