@@ -16,23 +16,14 @@ import org.keycloak.services.ServicesLogger;
 import org.keycloak.services.messages.Messages;
 import org.keycloak.services.validation.Validation;
 
-import org.json.JSONObject;
-
 import jakarta.ws.rs.core.MultivaluedMap;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import org.altcha.altcha.Altcha;
-import org.altcha.altcha.Altcha.ChallengeOptions;
-import org.altcha.altcha.Altcha.Challenge;
-import org.altcha.altcha.Altcha.Payload;
-
 public class RegistrationAltcha implements FormAction, FormActionFactory {
-    public static final String ALTCHA_RESPONSE = "altcha";
+    public static final String ALTCHA_RESPONSE = AltchaSupport.ALTCHA_RESPONSE;
     public static final String ALTCHA_REFERENCE_CATEGORY = "altcha";
-    // 1 hour expiration for captcha
-    public static final long ALTCHA_DEFAULT_EXPIRES = 3600;
 
     public static final String PROVIDER_ID = "registration-altcha-action";
 
@@ -100,45 +91,16 @@ public class RegistrationAltcha implements FormAction, FormActionFactory {
     public void buildPage(FormContext context, LoginFormsProvider form) {
         AuthenticatorConfigModel captchaConfig = context.getAuthenticatorConfig();
 
-        if (captchaConfig == null || captchaConfig.getConfig() == null
-                || captchaConfig.getConfig().get("secret") == null
-                ) {
+        if (captchaConfig == null || !AltchaSupport.isConfigured(captchaConfig.getConfig())) {
             form.addError(new FormMessage(null, Messages.RECAPTCHA_NOT_CONFIGURED));
             return;
         }
 
-        // retrieve ALTCHA settings
-        String hmacSecret = captchaConfig.getConfig().get("secret");
-        String floating = captchaConfig.getConfig().get("floating");
-        long complexity = Integer.parseInt(captchaConfig.getConfig().get("complexity"));
-
-        // create challenge
-        ChallengeOptions options = new ChallengeOptions()
-            .setMaxNumber(complexity)
-            .setHmacKey(hmacSecret)
-            .setExpiresInSeconds(ALTCHA_DEFAULT_EXPIRES);
-
-        // create payload
         try {
-            Challenge challenge = Altcha.createChallenge(options);
-        
-            // add payload data to the form
-            JSONObject jsonPayload = new JSONObject();
-
-            jsonPayload.put("algorithm", challenge.algorithm);
-            jsonPayload.put("challenge", challenge.challenge);
-            jsonPayload.put("salt", challenge.salt);
-            jsonPayload.put("signature", challenge.signature);
-            jsonPayload.put("maxnumber", options.maxNumber);
-
-            form.setAttribute("altchaPayload", jsonPayload.toString());
-
+            AltchaSupport.applyChallenge(captchaConfig.getConfig(), form);
         } catch (Exception e) {
             ServicesLogger.LOGGER.recaptchaFailed(e);
         }
-
-        form.setAttribute("altchaRequired", true);
-        form.setAttribute("altchaFloating", floating);
     }
 
     @Override
@@ -162,11 +124,19 @@ public class RegistrationAltcha implements FormAction, FormActionFactory {
 
         // retrieve HMAC key
         AuthenticatorConfigModel captchaConfig = context.getAuthenticatorConfig();
-        String hmacKey = captchaConfig.getConfig().get("secret");
+        if (captchaConfig == null || !AltchaSupport.isConfigured(captchaConfig.getConfig())) {
+            errors.add(new FormMessage(null, Messages.RECAPTCHA_NOT_CONFIGURED));
+            formData.remove(ALTCHA_RESPONSE);
+            context.error(Errors.INVALID_REGISTRATION);
+            context.validationError(formData, errors);
+            context.excludeOtherErrors();
+            return;
+        }
+        String hmacKey = captchaConfig.getConfig().get(AltchaSupport.KEY_SECRET);
 
         try {
             // check if captcha solution is valid
-            if (!Altcha.verifySolution(captcha_resp, hmacKey, true)) {
+            if (!AltchaSupport.verifySolution(captcha_resp, hmacKey)) {
                 errors.add(new FormMessage("altcha.captchaValidationFailed"));
             }
 
@@ -207,37 +177,9 @@ public class RegistrationAltcha implements FormAction, FormActionFactory {
 
     }
 
-    private static final List<ProviderConfigProperty> CONFIG_PROPERTIES = new ArrayList<ProviderConfigProperty>();
-
-    static {
-        ProviderConfigProperty property;
-        
-        property = new ProviderConfigProperty();
-        property.setName("secret");
-        property.setLabel("ALTCHA HMAC Secret");
-        property.setType(ProviderConfigProperty.STRING_TYPE);
-        property.setHelpText("HMAC secret key - a long random string should be enough");
-        CONFIG_PROPERTIES.add(property);
-        
-        property = new ProviderConfigProperty();
-        property.setName("floating");
-        property.setLabel("ALTCHA Floating UI");
-        property.setType(ProviderConfigProperty.BOOLEAN_TYPE);
-        property.setHelpText("Enables the floating widget UI; see ALTCHA documentation for more details. Warning: the UI may need styling.");
-        CONFIG_PROPERTIES.add(property);
-        
-        property = new ProviderConfigProperty();
-        property.setName("complexity");
-        property.setLabel("Complexity");
-        property.setType(ProviderConfigProperty.STRING_TYPE);
-        property.setHelpText("Captcha complexity; see ALTCHA docs. 1000000 is a good value.");
-        property.setDefaultValue("1000000");
-        CONFIG_PROPERTIES.add(property);
-    }
-
     @Override
     public List<ProviderConfigProperty> getConfigProperties() {
-        return CONFIG_PROPERTIES;
+        return AltchaSupport.CONFIG_PROPERTIES;
     }
 
 }

@@ -27,16 +27,39 @@ There are a few steps you need to perform in the Keycloak Admin Console.
 - Give it a name (`altcha` is fine)
 - In the **ALTCHA HMAC Secret** field, write a random string (the longer, the better). This key will be used to sign and verify captcha challenges.
 - In the **Complexity** field, use a value comprised between 100 000 and 1 500 000 rounds. Write it without spaces and ensure that the chosen integer is positive. See [ALTCHA docs](https://altcha.org/docs/complexity/) for more details.
+- Optionally set **Challenge expiry (seconds)** (default `3600`). Keep the widget's `expire` attribute in your theme (expressed in **milliseconds**) at least as long as this value. Invalid or non-positive values fall back to the default.
 
 Here’s a valid configuration example:
 
 ![Step 2](img/step-02.png)
+
+### Login flow
+
+The extension can also protect the **login** form, in addition to (or instead of) registration.
+
+1. Click the **Authentication** left menu item and go to the **Flows** tab.
+2. Search for the flow named **Browser**, click on the options dropdown at the right and click on **Duplicate**. Give it whatever name you want.
+3. Click on the flow to see its steps.
+4. Inside the `<flow name> forms` sub-flow, **delete** the default **Username Password Form** step.
+5. On the same `<flow name> forms` sub-flow, click **Add step**, select **ALTCHA (Login)** in the list and click **Add**. This step both renders the username/password form and verifies the ALTCHA challenge, so it replaces the removed step.
+6. Set the **ALTCHA (Login)** step requirement to **Required** and move it into the position of the step you removed.
+7. Click the gear icon and fill in the **ALTCHA HMAC Secret**, **Floating UI** and **Complexity** fields, same as for registration above.
+
+Bind the flow as the **Browser flow** under the **Action** dropdown (or in **Authentication → Flows**) when you are ready.
 
 ### Theme configuration
 
 Now, you need to make changes on your current theme or create a new theme. Please refer to [the Keycloak documentation](https://www.keycloak.org/docs/latest/server_development/#_themes) to create or edit your own theme.
 
 You will need to edit the [login/register.ftl](https://github.com/keycloak/keycloak/blob/main/themes/src/main/resources/theme/keycloak.v2/login/register.ftl) template file and add the following lines after the `<@registerCommons.termsAcceptance/>` if block:
+
+```html
+<#if altchaRequired??>
+    <altcha-widget challengejson='${altchaPayload}' <#if altchaFloating?? && altchaFloating=="true">floating</#if> hidefooter delay="2000" auto="onload" expire="3600000"></altcha-widget>
+</#if>
+```
+
+For the **login flow**, edit the [login/login.ftl](https://github.com/keycloak/keycloak/blob/main/themes/src/main/resources/theme/keycloak.v2/login/login.ftl) template instead and add the same `<altcha-widget>` block inside the login `<form>`, before the submit button:
 
 ```html
 <#if altchaRequired??>
