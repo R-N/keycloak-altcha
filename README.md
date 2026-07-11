@@ -20,14 +20,15 @@ There are a few steps you need to perform in the Keycloak Admin Console.
 
 ![Step 1](img/step-01.png)
 
-4. On the parent step named `<flow name> registration form`, click the « + » icon and select **Add step**.
+4. On the parent step named `<flow name> registration form`, click the « + » icon and select **Add execution**.
 5. Select **ALTCHA** in the list and click **Add**.
 6. Set the **ALTCHA** step requirement from Disabled to **Required**.
 7. Click the gear icon at the right of the ALTCHA step, then fill the following information:
 - Give it a name (`altcha` is fine)
 - In the **ALTCHA HMAC Secret** field, write a random string (the longer, the better). This key will be used to sign and verify captcha challenges.
-- In the **Complexity** field, use a value comprised between 100 000 and 1 500 000 rounds. Write it without spaces and ensure that the chosen integer is positive. See [ALTCHA docs](https://altcha.org/docs/complexity/) for more details.
-- Optionally set **Challenge expiry (seconds)** (default `3600`). Keep the widget's `expire` attribute in your theme (expressed in **milliseconds**) at least as long as this value. Invalid or non-positive values fall back to the default.
+- In the **Complexity** field, use a value comprised between 50 000 and 500 000 rounds (defaults to 1000000). Write it without spaces and ensure that the chosen integer is positive. See [ALTCHA docs](https://altcha.org/docs/complexity/) for more details.
+- **Expiration delay** sets how many seconds a generated challenge stays valid (default `3600`).
+- **Display mode**, **Hide the ALTCHA footer**, **Automated verification** and **Minimal duration** are UI-only settings passed straight to the widget; see [the ALTCHA website-integration docs](https://altcha.org/docs/website-integration/) for what each one does.
 
 Here’s a valid configuration example:
 
@@ -43,7 +44,7 @@ The extension can also protect the **login** form, in addition to (or instead of
 4. Inside the `<flow name> forms` sub-flow, **delete** the default **Username Password Form** step.
 5. On the same `<flow name> forms` sub-flow, click **Add step**, select **ALTCHA (Login)** in the list and click **Add**. This step both renders the username/password form and verifies the ALTCHA challenge, so it replaces the removed step.
 6. Set the **ALTCHA (Login)** step requirement to **Required** and move it into the position of the step you removed.
-7. Click the gear icon and fill in the **ALTCHA HMAC Secret**, **Floating UI** and **Complexity** fields, same as for registration above.
+7. Click the gear icon and fill in the same properties as for registration above (**ALTCHA HMAC Secret**, **Expiration delay**, **Complexity**, **Display mode**, **Hide the ALTCHA footer**, **Automated verification**, **Minimal duration**).
 
 Bind the flow as the **Browser flow** under the **Action** dropdown (or in **Authentication → Flows**) when you are ready.
 
@@ -55,7 +56,7 @@ You will need to edit the [login/register.ftl](https://github.com/keycloak/keycl
 
 ```html
 <#if altchaRequired??>
-    <altcha-widget challengejson='${altchaPayload}' <#if altchaFloating?? && altchaFloating=="true">floating</#if> hidefooter delay="2000" auto="onload" expire="3600000"></altcha-widget>
+    <altcha-widget challenge='${altchaPayload}' auto="${altchaAuto}" configuration='{"minDuration": ${altchaMinDuration}, "hideFooter": ${altchaHideFooter} }' display="${altchaDisplay}"></altcha-widget>
 </#if>
 ```
 
@@ -63,7 +64,7 @@ For the **login flow**, edit the [login/login.ftl](https://github.com/keycloak/k
 
 ```html
 <#if altchaRequired??>
-    <altcha-widget challengejson='${altchaPayload}' <#if altchaFloating?? && altchaFloating=="true">floating</#if> hidefooter delay="2000" auto="onload" expire="3600000"></altcha-widget>
+    <altcha-widget challenge='${altchaPayload}' auto="${altchaAuto}" configuration='{"minDuration": ${altchaMinDuration}, "hideFooter": ${altchaHideFooter} }' display="${altchaDisplay}"></altcha-widget>
 </#if>
 ```
 
@@ -71,8 +72,8 @@ You can customize the widget settings following [the documentation](https://altc
 
 Then, save the following into the `login/resources/js` folder:
 ```
-curl -o altcha.min.js https://cdn.jsdelivr.net/gh/altcha-org/altcha/dist/altcha.min.js
-curl -o altcha-i18n.min.js https://cdn.jsdelivr.net/gh/altcha-org/altcha/dist_i18n/all.min.js
+curl -o altcha.min.js https://cdn.jsdelivr.net/npm/altcha@3.0.11/dist/main/altcha.min.js
+curl -o altcha-i18n.min.js https://cdn.jsdelivr.net/gh/altcha-org/altcha/dist/i18n/all.min.js
 ```
 _You will have to **update those files manually**, monitor [this Releases channel](https://github.com/altcha-org/altcha/releases) for security updates. Beware of breaking changes._
 
@@ -90,6 +91,8 @@ In the `theme.properties` file, add `js/altcha-import.js` into the `scripts=` se
 1. In the **Authentication** left menu item, **Flows tab**, click on the options dropdown of your custom registration flow and click on **Bind flow**.
 2. Finally, enable registration : go to **Realm settings**, **Login** tab, and toggle **User registration** on.
 
+_NB.: Ensure that your theme is **selected** in Realm Settings -> Themes._
+
 And that’s it!
 
 ## Compiling it yourself
@@ -100,7 +103,7 @@ Clone the repository:
 git clone https://git.lacontrevoie.fr/lacontrevoie/keycloak-altcha/
 ```
 
-Inside the repository, compile it using Maven with Java 17:
+Inside the repository, compile it using Maven with Java 21:
 
 ```bash
 mvn clean compile package
@@ -109,7 +112,7 @@ mvn clean compile package
 You can instruct Maven to use a specific Java version by prepending the JAVA_HOME environment variable:
 
 ```bash
-JAVA_HOME=/usr/lib/jvm/java-17-openjdk/  mvn clean compile package
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk/  mvn clean compile package
 ```
 You will get two JAR files in the `target/` folder. The one you’re looking for is `keycloak-altcha-jar-with-dependencies.jar`.
 

@@ -93,6 +93,11 @@ public class LoginAltchaAuthenticator extends UsernamePasswordForm {
                             challengeWithError(context, config, "altcha.captchaValidationFailed"));
                     return;
                 }
+                if (!AltchaSupport.registerSolutionOnce(captchaResp)) {
+                    context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS,
+                            challengeWithError(context, config, "altcha.captchaReplayed"));
+                    return;
+                }
             } catch (Exception e) {
                 ServicesLogger.LOGGER.recaptchaFailed(e);
                 context.failureChallenge(AuthenticationFlowError.INVALID_CREDENTIALS,

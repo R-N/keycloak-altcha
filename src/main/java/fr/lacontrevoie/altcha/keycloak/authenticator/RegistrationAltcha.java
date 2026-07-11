@@ -83,7 +83,7 @@ public class RegistrationAltcha implements FormAction, FormActionFactory {
 
     @Override
     public String getHelpText() {
-        return "Adds ALTCHA button.  ALTCHA verify that the entity that is registering is a human. It must be configured after you add it.";
+        return "Adds ALTCHA button. ALTCHA is a PoW captcha that helps to combat bot activity. It must be configured after you add it.";
     }
 
 
@@ -138,6 +138,11 @@ public class RegistrationAltcha implements FormAction, FormActionFactory {
             // check if captcha solution is valid
             if (!AltchaSupport.verifySolution(captcha_resp, hmacKey)) {
                 errors.add(new FormMessage("altcha.captchaValidationFailed"));
+            }
+
+            // if the solution is valid, register it to prevent replay attacks
+            if (!AltchaSupport.registerSolutionOnce(captcha_resp)) {
+                errors.add(new FormMessage("altcha.captchaReplayed"));
             }
 
         } catch (Exception e) {
